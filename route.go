@@ -17,6 +17,8 @@ import (
 type Route struct {
 	// Request handler for the route.
 	handler http.Handler
+	// if true, the route will never match
+	disabled bool
 	// If true, this route never matches: it is only used to build URLs.
 	buildOnly bool
 	// The name used to build URLs.
@@ -39,7 +41,7 @@ func (r *Route) SkipClean() bool {
 
 // Match matches the route against the request.
 func (r *Route) Match(req *http.Request, match *RouteMatch) bool {
-	if r.buildOnly || r.err != nil {
+	if r.buildOnly || r.err != nil || r.disabled {
 		return false
 	}
 
@@ -414,6 +416,91 @@ func (r *Route) Queries(pairs ...string) *Route {
 	}
 
 	return r
+}
+
+func (r *Route) filterMatchers(f func(m matcher) bool) *Route {
+	matchers := make([]matcher, 0, len(r.matchers))
+	for _, m := range r.matchers {
+		if f(m) {
+			matchers = append(matchers, m)
+		}
+	}
+	r.matchers = matchers
+	return r
+}
+
+func isQueryMatcher(m matcher) bool {
+	if reM, ok := m.(*routeRegexp); ok {
+		if reM.regexpType == regexpTypeQuery {
+			return true
+		}
+	}
+	return false
+}
+
+func isHeaderMatcher(m matcher) bool {
+	if _, ok := m.(headerMatcher); ok {
+		return true
+	}
+	if _, ok := m.(headerRegexMatcher); ok {
+		return true
+	}
+	return false
+}
+
+func isMethodMatcher(m matcher) bool {
+	if _, ok := m.(methodMatcher); ok {
+		return true
+	}
+	return false
+}
+
+// ResetQueries clears any query matchers attached to the route
+func (r *Route) ResetQueries() *Route {
+	return r.filterMatchers(func(m matcher) bool { return !isQueryMatcher(m) })
+}
+
+// ResetHeaders clears any header matchers attached to the route
+func (r *Route) ResetHeaders() *Route {
+	return r.filterMatchers(func(m matcher) bool { return !isHeaderMatcher(m) })
+}
+
+// ResetMethods clears any method matchers attached to the route
+func (r *Route) ResetMethods() *Route {
+	return r.filterMatchers(func(m matcher) bool { return !isMethodMatcher(m) })
+}
+
+func (r *Route) replacePathMatcher(tpl string, matcherType regexpType) *Route {
+	for i, m := range r.matchers {
+		if reM, ok := m.(*routeRegexp); ok {
+			if reM.regexpType == matcherType {
+				r.regexp.path = nil
+				r.matchers = append(r.matchers[0:i], r.matchers[i+1:]...)
+				r.err = r.addRegexpMatcher(tpl, matcherType)
+			}
+		}
+	}
+	return r
+}
+
+// UpdatePath allows for the path matcher to be replaced
+func (r *Route) UpdatePath(tpl string) *Route {
+	return r.replacePathMatcher(tpl, regexpTypePath)
+}
+
+// UpdatePrefix allows for the prefix matcher to be replaced
+func (r *Route) UpdatePrefix(tpl string) *Route {
+	return r.replacePathMatcher(tpl, regexpTypePrefix)
+}
+
+// SetEnabled toggles the enabled state of the route
+func (r *Route) SetEnabled(enabled bool) {
+	r.disabled = !enabled
+}
+
+// IsEnabled returns if the route can match or not based on the disabled property
+func (r *Route) IsEnabled() bool {
+	return !r.disabled
 }
 
 // Schemes --------------------------------------------------------------------
