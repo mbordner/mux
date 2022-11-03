@@ -605,7 +605,7 @@ func matchMapWithString(toCheck map[string]string, toMatch map[string][]string, 
 
 // matchMapWithRegex returns true if the given key/value pairs exist in a given map compiled against
 // the given regex
-func matchMapWithRegex(toCheck map[string]*regexp.Regexp, toMatch map[string][]string, canonicalKey bool) bool {
+func matchMapWithRegex(toCheck map[string]*regexp.Regexp, toMatch map[string][]string, canonicalKey bool, match *RouteMatch) bool {
 	for k, v := range toCheck {
 		// Check if key exists.
 		if canonicalKey {
@@ -619,6 +619,18 @@ func matchMapWithRegex(toCheck map[string]*regexp.Regexp, toMatch map[string][]s
 			valueExists := false
 			for _, value := range values {
 				if v.MatchString(value) {
+					matches := v.FindStringSubmatch(value)
+					if len(matches) > 1 {
+						names := v.SubexpNames()
+						for i := 1; i < len(names); i++ {
+							if len(names[i]) > 0 {
+								if match.Vars == nil {
+									match.Vars = make(map[string]string)
+								}
+								match.Vars[names[i]] = matches[i]
+							}
+						}
+					}
 					valueExists = true
 					break
 				}

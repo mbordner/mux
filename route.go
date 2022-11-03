@@ -261,7 +261,7 @@ func (r *Route) Headers(pairs ...string) *Route {
 type headerRegexMatcher map[string]*regexp.Regexp
 
 func (m headerRegexMatcher) Match(r *http.Request, match *RouteMatch) bool {
-	return matchMapWithRegex(m, r.Header, true)
+	return matchMapWithRegex(m, r.Header, true, match)
 }
 
 // HeadersRegexp accepts a sequence of key/value pairs, where the value has regex
