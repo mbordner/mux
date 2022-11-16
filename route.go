@@ -408,15 +408,18 @@ func (r *Route) Queries(pairs ...string) *Route {
 	return r
 }
 
-func (r *Route) filterMatchers(f func(m matcher) bool) *Route {
+func (r *Route) filterMatchers(f func(m matcher) bool) []matcher {
 	matchers := make([]matcher, 0, len(r.matchers))
+	removed := make([]matcher, 0, len(r.matchers))
 	for _, m := range r.matchers {
 		if f(m) {
 			matchers = append(matchers, m)
+		} else {
+			removed = append(removed, m)
 		}
 	}
 	r.matchers = matchers
-	return r
+	return removed
 }
 
 func isQueryMatcher(m matcher) bool {
@@ -447,17 +450,23 @@ func isMethodMatcher(m matcher) bool {
 
 // ResetQueries clears any query matchers attached to the route
 func (r *Route) ResetQueries() *Route {
-	return r.filterMatchers(func(m matcher) bool { return !isQueryMatcher(m) })
+	removed := r.filterMatchers(func(m matcher) bool { return !isQueryMatcher(m) })
+	if len(removed) > 0 {
+		r.regexp.queries = nil
+	}
+	return r
 }
 
 // ResetHeaders clears any header matchers attached to the route
 func (r *Route) ResetHeaders() *Route {
-	return r.filterMatchers(func(m matcher) bool { return !isHeaderMatcher(m) })
+	_ = r.filterMatchers(func(m matcher) bool { return !isHeaderMatcher(m) })
+	return r
 }
 
 // ResetMethods clears any method matchers attached to the route
 func (r *Route) ResetMethods() *Route {
-	return r.filterMatchers(func(m matcher) bool { return !isMethodMatcher(m) })
+	_ = r.filterMatchers(func(m matcher) bool { return !isMethodMatcher(m) })
+	return r
 }
 
 func (r *Route) replacePathMatcher(tpl string, matcherType regexpType) *Route {
