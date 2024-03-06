@@ -458,6 +458,19 @@ func isMethodMatcher(m matcher) bool {
 	return false
 }
 
+func isSchemeMatcher(m matcher) bool {
+	if _, ok := m.(schemeMatcher); ok {
+		return true
+	}
+	return false
+}
+
+// ResetSchemes clears any scheme matchers attached to the route
+func (r *Route) ResetSchemes() *Route {
+	_ = r.filterMatchers(func(m matcher) bool { return !isSchemeMatcher(m) })
+	return r
+}
+
 // ResetQueries clears any query matchers attached to the route
 func (r *Route) ResetQueries() *Route {
 	removed := r.filterMatchers(func(m matcher) bool { return !isQueryMatcher(m) })
